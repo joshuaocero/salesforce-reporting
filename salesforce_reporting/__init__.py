@@ -5,7 +5,11 @@ from salesforce_reporting.parsers import (
     MatrixParser,
 )
 
-from salesforce_reporting.login import (
-    Connection,
+from salesforce_reporting.conn import (
+    SoapConnection,
+    RestConnection
+)
+
+from salesforce_reporting.exceptions import (
     AuthenticationFailure
 )
