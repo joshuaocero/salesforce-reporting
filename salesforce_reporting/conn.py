@@ -2,6 +2,8 @@
 import requests
 import xml.dom.minidom
 
+from salesforce_reporting.exceptions import AuthenticationFailure
+
 try:
     # Python 3+
     from html import escape
@@ -9,7 +11,66 @@ except ImportError:
     from cgi import escape
 
 
-class Connection:
+class RestConnection:
+    """
+    A Salesforce connection for accessing the Salesforce Analytics API using
+    the RESTful API. This object is then used as the central
+    object for passing report requests into Salesforce.
+
+    By default the object assumes you are connection to a Production instance
+    and using API v29.0 but both of these can be overridden to allow access to Sandbox
+    instances and/or use a different API version.
+
+    Parameters
+    ----------
+    client_id: string
+        API ID/Key used to connect to SF
+    client_secret: string
+        API secret associated with the ID
+    username: string
+        Salesforce username used for this conneciton
+    password: string
+        Salesforce password attached to the username
+    auth_url: string
+        URL to be used to authenticate to saleforce
+    api_version: string
+        API version to use for this connection
+    """
+
+    def __init__(self, client_id=None, client_secret=None, username=None,
+                    password=None, auth_url=None, api_version='v46.0'):
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.username = username
+        self.password = password
+        self.grant_type = 'password'
+        self.api_version = api_version
+        self.auth_url = auth_url
+
+    def _get_login_headers(self):
+        return {"Accept": "application/json",
+                "Content-type": "application/json"}
+    
+    def _get_login_params(self):
+        return {"client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "username": self.username,
+                "password": self.password,
+                "grant_type": self.grant_type}
+    
+    def do_login(self):
+        response = requests.post(self.auth_url,
+                                 headers=self._get_login_headers(),
+                                 params=self._get_login_params())
+        
+        if response.status_code not in [200, 201]:
+            raise AuthenticationFailure(response.status_code, response.text)
+
+        response_payload = response.json()
+        return response_payload
+
+
+class SoapConnection:
     """
     A Salesforce connection for accessing the Salesforce Analytics API using
     the Password/Token authentication. This object is then used as the central
@@ -107,55 +168,3 @@ class Connection:
                      .replace('-api', ''))
 
         return {'oauth': oauth_token, 'instance': instance}
-
-    def _get_metadata(self, url):
-        return requests.get(url + '/describe', headers=self.headers).json()
-
-    def _get_report_filtered(self, url, filters):
-        metadata_url = url.split('?')[0]
-        metadata = self._get_metadata(metadata_url)
-        for report_filter in filters:
-            metadata["reportMetadata"]["reportFilters"].append(report_filter)
-
-        return requests.post(url, headers=self.headers, json=metadata).json()
-
-    def _get_report_all(self, url):
-        return requests.post(url, headers=self.headers).json()
-
-    def get_report(self, report_id, filters=None, details=True):
-        """
-        Return the full JSON content of a Salesforce report, with or without filters.
-
-        Parameters
-        ----------
-        report_id: string
-            Salesforce Id of target report
-        filters: dict {field: filter}, optional
-        details: boolean, default True
-            Whether or not detail rows are included in report output
-
-        Returns
-        -------
-        report: JSON
-        """
-        details = 'true' if details else 'false'
-        url = '{}/reports/{}?includeDetails={}'.format(self.base_url, report_id, details)
-
-        if filters:
-            return self._get_report_filtered(url, filters)
-        else:
-            return self._get_report_all(url)
-
-    def get_dashboard(self, dashboard_id):
-        url = '{}/dashboards/{}/'.format(self.base_url, dashboard_id)
-        return requests.get(url, headers=self.headers).json()
-
-
-class AuthenticationFailure(Exception):
-
-    def __init__(self, code, msg):
-        self.code = code
-        self.msg = msg
-
-    def __str__(self):
-        return "{}: {}.".format(self.code, self.msg)
