@@ -10,13 +10,19 @@ Install via pip - `pip install salesforce-reporting`
 
 ###Authentication###
 
-Connect to the Salesforce Analytics API using password authentication:
+Connect to the Salesforce Analytics SOAP API using password authentication:
 ```python
-from salesforce_reporting import Connection
+from salesforce_reporting.conn import SoapConnection
 
-sf = Connection(username='your_username', password='your_password', security_token='your_token')
+sf = SoapConnection(username='your_username', password='your_password', security_token='your_token')
 ```
+OR For Rest API
+```python
+from salesforce_reporting.conn import RestConnection
 
+sf = RestConnection(lient_id='app_id', client_secret='app_secret', username='user', password='password', auth_url='auth_url')
+auth_details = sf.do_login()
+```
 ###Get records from a report###
 
 Use the `Connection.get_report()` method to request report data and then use ReportParser to access all the records included in a report (in list format if you use the `ReportParser.records()` method):
